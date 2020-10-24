@@ -449,15 +449,29 @@ INHERIT-INPUT-METHOD have the same meaning as in `completing-read'."
           (command-execute (intern-soft c)))
         (cons (kbd "C-h") (lambda (c) (describe-function (intern-soft c))))))
 
+(defmacro raven--make-obarray-candidates-fn (pred)
+  (let ((pattern (gensym "pattern"))
+        (prefix  (gensym "prefix"))
+        (regexp  (gensym "regexp"))
+        (item    (gensym "item")))
+    `(lambda (,pattern)
+       (let ((,prefix (if (string-match "\\([^ \f\t\n\r\v]+\\)" ,pattern)
+                          (match-string 1 ,pattern)
+                        ""))
+             (,regexp (raven-pattern-regex ,pattern)))
+         (all-completions
+          ,prefix obarray
+          (lambda (,item)
+            (and (funcall ,pred ,item)
+                 (string-match-p ,regexp (symbol-name ,item)))))))))
+
 ;;;###autoload
 (defun raven-extended-commands-source ()
   "Source for extended commands (`M-x')."
   (raven-source-create
    "Commands"
    :candidates
-   (-map
-    #'raven-candidate-create
-    (all-completions "" obarray #'commandp))
+   (raven--make-obarray-candidates-fn #'commandp)
    :actions
    raven-extended-command-actions))
 
@@ -479,7 +493,7 @@ INHERIT-INPUT-METHOD have the same meaning as in `completing-read'."
   (raven-source-create
    "Commands"
    :candidates
-   (lambda (r) (-map #'raven-candidate-create (all-completions r obarray #'commandp)))
+   (raven--make-obarray-candidates-fn #'commandp)
    :actions
    (list (lambda (c) (describe-function (intern-soft c))))))
 
@@ -487,9 +501,9 @@ INHERIT-INPUT-METHOD have the same meaning as in `completing-read'."
 (defun raven-apropos-function-source ()
   "Source for function lookup."
   (raven-source-create
-   "Functions"
+   "Functions, Macros & Special Forms"
    :candidates
-   (lambda (r) (-map #'raven-candidate-create (all-completions r obarray #'fboundp)))
+   (raven--make-obarray-candidates-fn #'fboundp)
    :actions
    (list (lambda (c) (describe-function (intern-soft c))))))
 
@@ -499,11 +513,10 @@ INHERIT-INPUT-METHOD have the same meaning as in `completing-read'."
   (raven-source-create
    "Variables"
    :candidates
-   (lambda (r) (-map #'raven-candidate-create
-                     (all-completions
-                      r obarray
-                      (lambda (x) (let ((sym (intern-soft x)))
-                                    (and (boundp sym) (not (keywordp sym))))))))
+   (raven--make-obarray-candidates-fn
+    (lambda (sym)
+      (and (boundp sym)
+           (not (keywordp sym)))))
    :actions
    (list (lambda (c) (describe-variable (intern-soft c))))))
 
