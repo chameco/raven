@@ -48,15 +48,16 @@
 
 (defvar raven-minibuffer-map (make-sparse-keymap))
 (define-key raven-minibuffer-map (kbd "\\") (lambda () (interactive) nil))
-(define-key raven-minibuffer-map (kbd "C-g") 'raven-quit)
-(define-key raven-minibuffer-map (kbd "C-c") 'raven-quit)
-(define-key raven-minibuffer-map (kbd "<return>") 'raven-do)
-(define-key raven-minibuffer-map (kbd "<backtab>") 'raven-previous)
-(define-key raven-minibuffer-map (kbd "<tab>") 'raven-next)
-(define-key raven-minibuffer-map (kbd "<up>") 'raven-previous)
-(define-key raven-minibuffer-map (kbd "<down>") 'raven-next)
-(define-key raven-minibuffer-map (kbd "<prior>") 'raven-previous-source)
-(define-key raven-minibuffer-map (kbd "<next>") 'raven-next-source)
+(define-key raven-minibuffer-map (kbd "C-g")       #'raven-quit)
+(define-key raven-minibuffer-map (kbd "C-c")       #'raven-quit)
+(define-key raven-minibuffer-map (kbd "<return>")  #'raven-do)
+(define-key raven-minibuffer-map (kbd "<backtab>") #'raven-previous)
+(define-key raven-minibuffer-map (kbd "<tab>")     #'raven-next)
+(define-key raven-minibuffer-map (kbd "<up>")      #'raven-previous)
+(define-key raven-minibuffer-map (kbd "<down>")    #'raven-next)
+(define-key raven-minibuffer-map (kbd "<prior>")   #'raven-previous-source)
+(define-key raven-minibuffer-map (kbd "<next>")    #'raven-next-source)
+(define-key raven-minibuffer-map (kbd "C-M-i")     #'raven-complete)
 
 (when (fboundp 'evil-define-key)
   (evil-define-key 'normal raven-minibuffer-map
@@ -642,6 +643,26 @@ meaning as in `read-file-name'."
     (split-string (f-read-text file) "\n"))
    :actions
    (raven-file-contents-actions file)))
+
+(defcustom raven-do-on-single-match t
+  "Automatically call `raven-do' when `raven-complete' finds a single match."
+  :type 'boolean)
+
+(defun raven-complete ()
+  "Complete the current raven input as far as possible."
+  (interactive)
+  (let ((candidates (-map #'raven-candidate-display-string
+                          (-mapcat #'raven-source-candidates raven--matching))))
+    (let ((result (try-completion raven--last candidates)))
+      (cond
+       ((null result) nil)        ;; No match at all.
+       ((eq t result)             ;; A single match.
+        (when raven-do-on-single-match
+          (raven-do))
+        t)
+       ((stringp result)          ;; Complete common part of candidates.
+        (insert (substring result (length raven--last)))
+        t)))))
 
 (provide 'raven)
 ;;; raven.el ends here
